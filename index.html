@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+   
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval' https://pl30421604.effectivecpmnetwork.com https://pl30421605.effectivecpmnetwork.com; connect-src *; img-src *; frame-src *; style-src * 'unsafe-inline';"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mi Netflix</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <!-- <div class="logo">MiNetflix</div> -->
+    <div class="nav-tabs">
+        <button class="tab-btn active" data-tab="inicio">Inicio</button>
+        <button class="tab-btn" data-tab="peliculas">Películas</button>
+        <button class="tab-btn" data-tab="series">Series</button>
+        <button class="tab-btn" data-tab="anime">Anime</button>
+        <button class="tab-btn" data-tab="favoritos">Mi Lista</button>
+        <button class="tab-btn" data-tab="buscar">Buscar</button>
+    </div>
+
+    <!-- Contenedor para Inicio -->
+    <div id="contenido-inicio" class="tab-content active">
+        <div id="hero-carousel" class="hero-carousel">
+            <div class="hero-slide active">
+                <div class="hero-bg"></div>
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2 class="hero-title"></h2>
+                    <div class="hero-meta">
+                        <span class="hero-year"></span>
+                        <span class="hero-duration"></span>
+                    </div>
+                    <p class="hero-synopsis"></p>
+                    <div class="hero-buttons">
+                        <!-- Los botones se generan desde JavaScript -->
+                    </div>
+                </div>
+            </div>
+            <button class="carousel-prev">❮</button>
+            <button class="carousel-next">❯</button>
+            <div class="carousel-dots"></div>
+        </div>
+
+        <div id="categories-container-inicio"></div>
+    </div>
+
+    <!-- Contenedor para Películas -->
+    <div id="contenido-peliculas" class="tab-content">
+        <!-- NUEVO CARRUSEL PARA PELÍCULAS -->
+        <div id="hero-carousel-peliculas" class="hero-carousel">
+            <div class="hero-slide active">
+                <div class="hero-bg"></div>
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2 class="hero-title"></h2>
+                    <div class="hero-meta">
+                        <span class="hero-year"></span>
+                        <span class="hero-duration"></span>
+                    </div>
+                    <p class="hero-synopsis"></p>
+                    <div class="hero-buttons"></div>
+                </div>
+            </div>
+            <button class="carousel-prev">❮</button>
+            <button class="carousel-next">❯</button>
+            <div class="carousel-dots"></div>
+        </div>
+        <!-- FIN CARRUSEL -->
+        <div id="categories-container-peliculas"></div>
+    </div>
+
+    <!-- Contenedor para Series -->
+    <div id="contenido-series" class="tab-content">
+        <!-- NUEVO CARRUSEL PARA SERIES -->
+        <div id="hero-carousel-series" class="hero-carousel">
+            <div class="hero-slide active">
+                <div class="hero-bg"></div>
+                <div class="hero-overlay"></div>
+                <div class="hero-content">
+                    <h2 class="hero-title"></h2>
+                    <div class="hero-meta">
+                        <span class="hero-year"></span>
+                        <span class="hero-duration"></span>
+                    </div>
+                    <p class="hero-synopsis"></p>
+                    <div class="hero-buttons"></div>
+                </div>
+            </div>
+            <button class="carousel-prev">❮</button>
+            <button class="carousel-next">❯</button>
+            <div class="carousel-dots"></div>
+        </div>
+        <!-- FIN CARRUSEL -->
+        <div id="categories-container-series"></div>
+    </div>
+
+    <!-- Contenedor para Mis Favosritos-->
+    <div id="contenido-favoritos" class="tab-content">
+        <div id="favoritos-container" style="padding: 20px;">
+            <h2 style="color:white; margin-bottom:20px; text-align: center; ">Favoritos</h2>
+            <div id="favoritos-grid" class="favoritos-grid"></div>
+        </div>
+    </div>
+
+<!-- Contenedor para Buscar -->
+<div id="contenido-buscar" class="tab-content">
+    <div id="search-container" class="search-container">
+        <!-- Barra de filtros e input -->
+        <div class="search-header">
+            <div class="search-filters">
+                <button class="filter-btn active" data-filter="movie">Películas</button>
+                <button class="filter-btn" data-filter="tv">Series</button>
+                <button class="filter-btn" data-filter="anime">Anime</button>
+            </div>
+            <div class="search-input-wrapper">
+                <input type="text" id="search-input" placeholder="Buscar películas, series..." autofocus>
+                <button id="search-btn" class="search-submit-btn">🔍</button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD (visible por defecto) -->
+        <div id="search-dashboard" class="search-dashboard"></div>
+
+        <!-- RESULTADOS (oculto inicialmente) -->
+        <div id="search-results-wrapper" class="search-results-wrapper" style="display:none;">
+            <h2 id="search-results-title">Resultados</h2>
+            <div id="search-results-grid" class="search-results-grid"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Contenedor para Anime -->
+<div id="contenido-anime" class="tab-content">
+    <!-- NUEVO CARRUSEL PARA ANIME -->
+    <div id="hero-carousel-anime" class="hero-carousel">
+        <div class="hero-slide active">
+            <div class="hero-bg"></div>
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+                <h2 class="hero-title"></h2>
+                <div class="hero-meta">
+                    <span class="hero-year"></span>
+                    <span class="hero-duration"></span>
+                </div>
+                <p class="hero-synopsis"></p>
+                <div class="hero-buttons"></div>
+            </div>
+        </div>
+        <button class="carousel-prev">❮</button>
+        <button class="carousel-next">❯</button>
+        <div class="carousel-dots"></div>
+    </div>
+    <!-- BANNER NATIVO GLOBAL (compacto) -->
+<div style="position:relative; border:2px solid #ff0000; border-radius:3px; margin:12px auto; max-width:480px; background:#000000; padding:6px 6px 4px 6px;">
+    <span style="position:absolute; top:-10px; left:10px; background:#ff0000; color:#ffffff; font-size:11px; font-weight:bold; padding:0 8px; border-radius:0; line-height:20px; z-index:5;">Anuncios</span>
+    <script async="async" data-cfasync="false" src="https://pl30421605.effectivecpmnetwork.com/ad38c5fc9e0efebdcc1403aa16ab4d45/invoke.js"></script>
+    <div id="container-ad38c5fc9e0efebdcc1403aa16ab4d45"></div>
+</div>
+    <!-- FIN CARRUSEL -->
+    <div id="categories-container-anime"></div>
+</div>
+
+<!-- REPRODUCTOR MODAL MEJORADO (con controles de serie) -->
+<div id="player-modal" style="display: none;">
+  <div class="player-overlay"></div>
+  <div class="player-container">
+    <!-- Barra de controles superior (ocupa todo el ancho) -->
+    <div class="player-controls-bar">
+      <button id="player-back-btn" class="player-btn">← Volver</button>
+      <div class="player-api-selector">
+        <span>Fuente:</span>
+        <button class="api-btn active" data-api="unlimplay">UnlimPlay</button>
+        <button class="api-btn" data-api="vidsrc">VidSrc</button>
+        <button class="api-btn" data-api="animeav1">AnimeAV1</button>
+      </div>
+    </div>
+
+    <!-- Cuerpo principal: dos columnas -->
+    <div class="player-main">
+      <!-- Columna izquierda: video + info -->
+      <div class="player-left">
+        <!-- Contenedor del iframe (se expande) -->
+        <div class="player-iframe-wrapper" id="player-iframe-wrapper" style="display: none;">
+          <div id="player-iframe-loading" class="player-iframe-loading">
+            <div class="spinner"></div>
+          </div>
+          <iframe id="player-iframe" src="" allowfullscreen></iframe>
+        </div>
+        <!-- Información compacta (título, año, duración, sinopsis) -->
+        <div class="player-info-compact">
+          <h2 class="player-title" id="player-title"></h2>
+          <div class="player-meta" id="player-meta">
+            <span class="player-year"></span>
+            <span class="player-duration"></span>
+          </div>
+          <p class="player-synopsis" id="player-synopsis"></p>
+          <div class="player-fav-container" id="player-fav-container">
+        <button id="player-fav-btn" class="player-fav-btn">♡ Agregar a Favoritos</button>
+    </div>
+        </div>
+      </div>
+
+      <!-- Columna derecha: episodios y relacionados -->
+      <div class="player-right">
+        <!-- Controles de serie (selector de temporada + lista de episodios) -->
+        <div class="player-episode-controls" id="player-episode-controls" style="display: none;">
+          <div class="season-selector">
+            <label for="season-select">Temporada</label>
+            <select id="season-select"></select>
+          </div>
+          <div class="episodes-list" id="episodes-scroll">
+            <!-- Los botones de capítulos se generarán dinámicamente -->
+          </div>
+        </div>
+        <!-- Relacionados (recomendaciones) -->
+        <div class="player-related" id="player-related">
+          <h3>Relacionados</h3>
+          <div class="related-grid" id="related-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="https://pl30421604.effectivecpmnetwork.com/74/9e/fc/749efc656fe2a4953208888d61b2e493.js"></script>
+</body>
+</html>
