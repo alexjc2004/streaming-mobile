@@ -33,6 +33,26 @@ let isPlayerVisible = false; // si el iframe está visible
 let isBannerVisible = true;
 const bannerStates = {};
 
+// Referencia al overlay de carga
+const loadingOverlay = document.getElementById('player-loading-overlay');
+
+// Función para mostrar la pantalla de carga
+function showLoadingOverlay() {
+    if (loadingOverlay) {
+        loadingOverlay.classList.add('active');
+        console.log('✅ Pantalla de carga ACTIVADA');
+    } else {
+        console.warn('❌ No se encontró #player-loading-overlay');
+    }
+}
+
+// Función para ocultar la pantalla de carga
+function hideLoadingOverlay() {
+    if (loadingOverlay) {
+        loadingOverlay.classList.remove('active');
+        console.log('✅ Pantalla de carga DESACTIVADA');
+    }
+}
 
 // ===== ACTUALIZAR BANNER (SOLO FONDO Y LOGO) =====
 function updatePlayerBanner(data) {
@@ -879,156 +899,161 @@ async function getSeriesDetails(tmdbId) {
 }
 
 async function openPlayerModal(data) {
+    showLoadingOverlay();
+    // Mostrar overlay de carga
     const modal = document.getElementById('player-modal');
     const iframeWrapper = document.getElementById('player-iframe-wrapper');
     const iframe = document.getElementById('player-iframe');
     const loadingEl = document.getElementById('player-iframe-loading');
     const episodeControls = document.getElementById('player-episode-controls');
 
-    // --- 1. Limpieza completa del estado anterior ---
+    // Limpieza completa del estado anterior
     if (iframe) iframe.src = '';
     if (iframeWrapper) iframeWrapper.style.display = 'none';
     if (loadingEl) loadingEl.classList.add('hidden');
-
     const episodesScroll = document.getElementById('episodes-scroll');
     if (episodesScroll) episodesScroll.innerHTML = '';
     const seasonSelect = document.getElementById('season-select');
     if (seasonSelect) seasonSelect.innerHTML = '';
-
 
     currentSeason = null;
     currentEpisode = null;
     isPlayerVisible = false;
     currentApi = 'unlimplay';
 
-    // --- 2. Si falta información, obtenerla de TMDB ---
-    if (data.tmdbId && (!data.overview || !data.year || !data.duration || !data.background || !data.titleImage)) {
     try {
-        const endpoint = data.mediaType === 'movie' ? 'movie' : 'tv';
-        const url = `https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}?api_key=${API_KEY}&language=es-ES`;
-        const response = await fetch(url);
-        const tmdbData = await response.json();
-
-        if (!data.overview) data.overview = tmdbData.overview || 'Sin sinopsis disponible';
-        if (!data.year) {
-            const date = tmdbData.release_date || tmdbData.first_air_date;
-            data.year = date ? date.split('-')[0] : '';
-        }
-        if (!data.duration) {
-            if (data.mediaType === 'movie') {
-                data.duration = formatRuntime(tmdbData.runtime);
-            } else {
-                const episodes = tmdbData.number_of_episodes || '?';
-                data.duration = `${episodes} episodios`;
-            }
-        }
-        // Si no hay poster, usar el de TMDB
-        if (!data.posterPath && tmdbData.poster_path) {
-            data.posterPath = `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`;
-        }
-        // Obtener backdrop
-        if (!data.background && tmdbData.backdrop_path) {
-            data.background = `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}`;
-        }
-        // Obtener logo (titleImage)
-        if (!data.titleImage) {
+        // --- Si falta información, obtenerla de TMDB ---
+        if (data.tmdbId && (!data.overview || !data.year || !data.duration || !data.background || !data.titleImage)) {
             try {
-                const imagesRes = await fetchWithRetry(`https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}/images?api_key=${API_KEY}&include_image_language=es,en,null`);
-                const logos = imagesRes.logos || [];
-                let logo = logos.find(l => l.iso_639_1 === 'es') || logos.find(l => l.iso_639_1 === 'en') || logos[0];
-                if (logo) {
-                    data.titleImage = `https://image.tmdb.org/t/p/w500${logo.file_path}`;
+                const endpoint = data.mediaType === 'movie' ? 'movie' : 'tv';
+                const url = `https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}?api_key=${API_KEY}&language=es-ES`;
+                const response = await fetch(url);
+                const tmdbData = await response.json();
+
+                if (!data.overview) data.overview = tmdbData.overview || 'Sin sinopsis disponible';
+                if (!data.year) {
+                    const date = tmdbData.release_date || tmdbData.first_air_date;
+                    data.year = date ? date.split('-')[0] : '';
                 }
-            } catch (e) {
-                // Si falla la obtención de logos, continuar sin logo
+                if (!data.duration) {
+                    if (data.mediaType === 'movie') {
+                        data.duration = formatRuntime(tmdbData.runtime);
+                    } else {
+                        const episodes = tmdbData.number_of_episodes || '?';
+                        data.duration = `${episodes} episodios`;
+                    }
+                }
+                if (!data.posterPath && tmdbData.poster_path) {
+                    data.posterPath = `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`;
+                }
+                if (!data.background && tmdbData.backdrop_path) {
+                    data.background = `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}`;
+                }
+                if (!data.titleImage) {
+                    try {
+                        const imagesRes = await fetchWithRetry(`https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}/images?api_key=${API_KEY}&include_image_language=es,en,null`);
+                        const logos = imagesRes.logos || [];
+                        let logo = logos.find(l => l.iso_639_1 === 'es') || logos.find(l => l.iso_639_1 === 'en') || logos[0];
+                        if (logo) {
+                            data.titleImage = `https://image.tmdb.org/t/p/w500${logo.file_path}`;
+                        }
+                    } catch (e) {}
+                }
+                if (tmdbData.genres && tmdbData.genres.length > 0) {
+                    data.genre = tmdbData.genres.map(g => g.name).join(', ');
+                } else if (data.genreIds) {
+                    const genreNames = getGenreNamesFromIds(data.genreIds, data.mediaType);
+                    if (genreNames) data.genre = genreNames;
+                }
+            } catch (error) {
+                console.warn('No se pudieron obtener detalles de TMDB:', error);
             }
         }
+
         // Guardar los datos actualizados
         currentModalData = data;
 
-        // Obtener géneros
-        if (tmdbData.genres && tmdbData.genres.length > 0) {
-            data.genre = tmdbData.genres.map(g => g.name).join(', ');
-        } else if (data.genreIds) {
-            const genreNames = getGenreNamesFromIds(data.genreIds, data.mediaType);
-            if (genreNames) data.genre = genreNames;
+        // Actualizar interfaz básica
+        const titleEl = document.getElementById('player-title');
+        if (titleEl) titleEl.textContent = data.title || 'Sin título';
+
+        const metaEl = document.getElementById('player-meta');
+        if (metaEl) {
+            metaEl.innerHTML = `
+                <span class="player-year">${data.year || ''}</span>
+                <span class="player-duration">${data.duration || ''}</span>
+            `;
         }
+        const synopsisEl = document.getElementById('player-synopsis');
+        if (synopsisEl) synopsisEl.textContent = data.overview || 'Sin sinopsis disponible';
 
-    } catch (error) {
-        console.warn('No se pudieron obtener detalles de TMDB:', error);
-    }
-}
-
-    // --- 4. Actualizar la interfaz con la información básica ---
-    const titleEl = document.getElementById('player-title');
-    if (titleEl) titleEl.textContent = data.title || 'Sin título';
-
-    const metaEl = document.getElementById('player-meta');
-    if (metaEl) {
-        metaEl.innerHTML = `
-            <span class="player-year">${data.year || ''}</span>
-            <span class="player-duration">${data.duration || ''}</span>
-        `;
-    }
-    const synopsisEl = document.getElementById('player-synopsis');
-    if (synopsisEl) synopsisEl.textContent = data.overview || 'Sin sinopsis disponible';
-
-    // --- 5. Cargar temporadas si es serie o anime ---
-    const isSeries = (data.mediaType === 'tv' || data.mediaType === 'anime');
-
-    if (isSeries && data.tmdbId) {
-        episodeControls.style.display = 'block';
-        const episodesContainer = document.getElementById('episodes-scroll');
-        if (episodesContainer) {
-            episodesContainer.innerHTML = '<div style="color:#aaa; padding:10px;">Cargando episodios...</div>';
-        }
-
-        try {
-            let seasons = data.seasons;
-            if (!seasons || seasons.length === 0) {
-                seasons = await getSeriesDetails(data.tmdbId);
+        // Cargar temporadas si es serie o anime
+        const isSeries = (data.mediaType === 'tv' || data.mediaType === 'anime');
+        if (isSeries && data.tmdbId) {
+            episodeControls.style.display = 'block';
+            const episodesContainer = document.getElementById('episodes-scroll');
+            if (episodesContainer) {
+                episodesContainer.innerHTML = '<div style="color:#aaa; padding:10px;">Cargando episodios...</div>';
             }
 
-            if (seasons && seasons.length > 0) {
-                data.seasons = seasons;
-                currentModalData.seasons = seasons;
-                populateSeasonEpisodes(data);
-            } else {
+            try {
+                let seasons = data.seasons;
+                if (!seasons || seasons.length === 0) {
+                    seasons = await getSeriesDetails(data.tmdbId);
+                }
+
+                if (seasons && seasons.length > 0) {
+                    data.seasons = seasons;
+                    currentModalData.seasons = seasons;
+                    populateSeasonEpisodes(data);
+                } else {
+                    episodeControls.style.display = 'none';
+                    if (episodesContainer) {
+                        episodesContainer.innerHTML = '<div style="color:#aaa;">No se encontraron episodios.</div>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando temporadas:', error);
                 episodeControls.style.display = 'none';
                 if (episodesContainer) {
-                    episodesContainer.innerHTML = '<div style="color:#aaa;">No se encontraron episodios.</div>';
+                    episodesContainer.innerHTML = '<div style="color:#ff6b6b;">Error al cargar episodios.</div>';
                 }
             }
-        } catch (error) {
-            console.error('Error cargando temporadas:', error);
+        } else {
             episodeControls.style.display = 'none';
-            if (episodesContainer) {
-                episodesContainer.innerHTML = '<div style="color:#ff6b6b;">Error al cargar episodios.</div>';
-            }
         }
-    } else {
-        episodeControls.style.display = 'none';
+
+        // Mostrar el modal
+        modal.style.display = 'flex';
+        modal.classList.remove('fullscreen');
+        disableMainScroll();
+
+
+
+        // Configurar banner
+        isBannerVisible = true;
+        updateControlsBarBackground();
+        document.getElementById('player-banner').style.display = 'flex';
+        document.getElementById('player-iframe-wrapper').style.display = 'none';
+        updatePlayerBanner(data);
+        updatePlayerInfo(data);
+        updatePlayButtonText();
+        updatePlayerFavButton();
+
+        // Ocultar overlay (todo listo)
+       hideLoadingOverlay();
+
+    } catch (error) {
+        console.error('Error abriendo el reproductor:', error);
+        const synopsisEl = document.getElementById('player-synopsis');
+        if (synopsisEl) {
+            synopsisEl.textContent = 'Error al cargar la información. Intenta de nuevo.';
+            synopsisEl.style.color = '#ff6b6b';
+        }
+        // Ocultar overlay en error
+        hideLoadingOverlay();
+        //modal.style.display = 'flex';
     }
-
-    // --- 7. Mostrar el modal ---
-    modal.style.display = 'flex';
-    modal.classList.remove('fullscreen');
-    disableMainScroll();
-
-    // Mostrar banner, ocultar iframe
-    isBannerVisible = true;
-    updateControlsBarBackground();
-    document.getElementById('player-banner').style.display = 'flex';
-    document.getElementById('player-iframe-wrapper').style.display = 'none';
-    updatePlayerBanner(data);
-    updatePlayerInfo(data);
-
-    // --- 8. Reproducir automáticamente ---
-    updatePlayButtonText();
-    
-
-    updatePlayerFavButton();
-    updatePlayButtonText();
 }
 
 function updatePlayerTitle() {
@@ -3762,6 +3787,9 @@ function closePlayerModal() {
     modal.style.display = 'none';
     modal.classList.remove('fullscreen');
     enableMainScroll();
+
+    // Ocultar overlay de carga si está visible
+    hideLoadingOverlay();
 
     // Restaurar banner
     const banner = document.getElementById('player-banner');
