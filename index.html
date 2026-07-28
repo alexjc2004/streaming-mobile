@@ -22,50 +22,23 @@
 
     <!-- Contenedor para Inicio -->
     <div id="contenido-inicio" class="tab-content active">
-        <div id="hero-carousel" class="hero-carousel">
-            <div class="hero-slide active">
-                <div class="hero-bg"></div>
-                <div class="hero-overlay"></div>
-                <div class="hero-content">
-                    <h2 class="hero-title"></h2>
-                    <div class="hero-meta">
-                        <span class="hero-year"></span>
-                        <span class="hero-duration"></span>
-                    </div>
-                    <p class="hero-synopsis"></p>
-                    <div class="hero-buttons">
-                        <!-- Los botones se generan desde JavaScript -->
-                    </div>
-                </div>
-            </div>
-            <button class="carousel-prev">❮</button>
-            <button class="carousel-next">❯</button>
-            <div class="carousel-dots"></div>
+        <div id="banner-carousel" class="banner-carousel">
+            <div class="banner-track"></div>
+            <button class="banner-prev">❮</button>
+            <button class="banner-next">❯</button>
+            <div class="banner-dots"></div>
         </div>
-
         <div id="categories-container-inicio"></div>
     </div>
 
     <!-- Contenedor para Películas -->
     <div id="contenido-peliculas" class="tab-content">
         <!-- NUEVO CARRUSEL PARA PELÍCULAS -->
-        <div id="hero-carousel-peliculas" class="hero-carousel">
-            <div class="hero-slide active">
-                <div class="hero-bg"></div>
-                <div class="hero-overlay"></div>
-                <div class="hero-content">
-                    <h2 class="hero-title"></h2>
-                    <div class="hero-meta">
-                        <span class="hero-year"></span>
-                        <span class="hero-duration"></span>
-                    </div>
-                    <p class="hero-synopsis"></p>
-                    <div class="hero-buttons"></div>
-                </div>
-            </div>
-            <button class="carousel-prev">❮</button>
-            <button class="carousel-next">❯</button>
-            <div class="carousel-dots"></div>
+        <div id="banner-carousel-peliculas" class="banner-carousel">
+            <div class="banner-track"></div>
+            <button class="banner-prev">❮</button>
+            <button class="banner-next">❯</button>
+            <div class="banner-dots"></div>
         </div>
         <!-- FIN CARRUSEL -->
         <div id="categories-container-peliculas"></div>
@@ -73,26 +46,12 @@
 
     <!-- Contenedor para Series -->
     <div id="contenido-series" class="tab-content">
-        <!-- NUEVO CARRUSEL PARA SERIES -->
-        <div id="hero-carousel-series" class="hero-carousel">
-            <div class="hero-slide active">
-                <div class="hero-bg"></div>
-                <div class="hero-overlay"></div>
-                <div class="hero-content">
-                    <h2 class="hero-title"></h2>
-                    <div class="hero-meta">
-                        <span class="hero-year"></span>
-                        <span class="hero-duration"></span>
-                    </div>
-                    <p class="hero-synopsis"></p>
-                    <div class="hero-buttons"></div>
-                </div>
-            </div>
-            <button class="carousel-prev">❮</button>
-            <button class="carousel-next">❯</button>
-            <div class="carousel-dots"></div>
+        <div id="banner-carousel-series" class="banner-carousel">
+            <div class="banner-track"></div>
+            <button class="banner-prev">❮</button>
+            <button class="banner-next">❯</button>
+            <div class="banner-dots"></div>
         </div>
-        <!-- FIN CARRUSEL -->
         <div id="categories-container-series"></div>
     </div>
 
@@ -122,6 +81,12 @@
 
         <!-- DASHBOARD (visible por defecto) -->
         <div id="search-dashboard" class="search-dashboard"></div>
+            <!-- BANNER NATIVO GLOBAL (compacto) -->
+<div style="position:relative; border:2px solid #ff0000; border-radius:3px; margin:12px auto; max-width:480px; background:#000000; padding:6px 6px 4px 6px;">
+    <span style="position:absolute; top:-10px; left:10px; background:#ff0000; color:#ffffff; font-size:11px; font-weight:bold; padding:0 8px; border-radius:0; line-height:20px; z-index:5;">Anuncios</span>
+    <script async="async" data-cfasync="false" src="https://pl30421605.effectivecpmnetwork.com/ad38c5fc9e0efebdcc1403aa16ab4d45/invoke.js"></script>
+    <div id="container-ad38c5fc9e0efebdcc1403aa16ab4d45"></div>
+</div>
 
         <!-- RESULTADOS (oculto inicialmente) -->
         <div id="search-results-wrapper" class="search-results-wrapper" style="display:none;">
@@ -133,30 +98,11 @@
 
 <!-- Contenedor para Anime -->
 <div id="contenido-anime" class="tab-content">
-    <!-- NUEVO CARRUSEL PARA ANIME -->
-    <div id="hero-carousel-anime" class="hero-carousel">
-        <div class="hero-slide active">
-            <div class="hero-bg"></div>
-            <div class="hero-overlay"></div>
-            <div class="hero-content">
-                <h2 class="hero-title"></h2>
-                <div class="hero-meta">
-                    <span class="hero-year"></span>
-                    <span class="hero-duration"></span>
-                </div>
-                <p class="hero-synopsis"></p>
-                <div class="hero-buttons"></div>
-            </div>
-        </div>
-        <button class="carousel-prev">❮</button>
-        <button class="carousel-next">❯</button>
-        <div class="carousel-dots"></div>
-    </div>
-    <!-- BANNER NATIVO GLOBAL (compacto) -->
-<div style="position:relative; border:2px solid #ff0000; border-radius:3px; margin:12px auto; max-width:480px; background:#000000; padding:6px 6px 4px 6px;">
-    <span style="position:absolute; top:-10px; left:10px; background:#ff0000; color:#ffffff; font-size:11px; font-weight:bold; padding:0 8px; border-radius:0; line-height:20px; z-index:5;">Anuncios</span>
-    <script async="async" data-cfasync="false" src="https://pl30421605.effectivecpmnetwork.com/ad38c5fc9e0efebdcc1403aa16ab4d45/invoke.js"></script>
-    <div id="container-ad38c5fc9e0efebdcc1403aa16ab4d45"></div>
+    <div id="banner-carousel-anime" class="banner-carousel">
+    <div class="banner-track"></div>
+    <button class="banner-prev">❮</button>
+    <button class="banner-next">❯</button>
+    <div class="banner-dots"></div>
 </div>
     <!-- FIN CARRUSEL -->
     <div id="categories-container-anime"></div>
