@@ -3370,3 +3370,34 @@ justify-content: center;
     border-color: #e5091400;
     color: #e50914;
 }
+
+/* ===== OVERLAY DE CARGA DEL MODAL ===== */
+#player-loading-overlay {
+  position: fixed;  /* Usamos fixed para que cubra toda la pantalla */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;  /* Un valor muy alto para estar por encima de todo */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+#player-loading-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#player-loading-overlay .spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(255, 255, 255, 0.1);
+  border-top: 6px solid #e50914;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
