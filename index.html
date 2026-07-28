@@ -108,62 +108,62 @@
     <div id="categories-container-anime"></div>
 </div>
 
-<!-- REPRODUCTOR MODAL MEJORADO (con controles de serie) -->
+<!-- REPRODUCTOR MODAL -->
 <div id="player-modal" style="display: none;">
-  <div class="player-overlay"></div>
   <div class="player-container">
-    <!-- Barra de controles superior (ocupa todo el ancho) -->
-    <div class="player-controls-bar">
-      <button id="player-back-btn" class="player-btn">← Volver</button>
-      <div class="player-api-selector">
-        <span>Fuente:</span>
-        <button class="api-btn active" data-api="unlimplay">UnlimPlay</button>
-        <button class="api-btn" data-api="vidsrc">VidSrc</button>
-        <button class="api-btn" data-api="animeav1">AnimeAV1</button>
-      </div>
-    </div>
-
-    <!-- Cuerpo principal: dos columnas -->
+    <!-- Cuerpo principal: una sola columna -->
     <div class="player-main">
-      <!-- Columna izquierda: video + info -->
       <div class="player-left">
-        <!-- Contenedor del iframe (se expande) -->
+        <!-- BARRA DE CONTROLES (movida aquí) -->
+        <div class="player-controls-bar" id="player-controls-bar">
+          <button id="player-back-btn" class="player-btn">‹</button>
+          <div class="player-api-selector">
+            <button class="api-btn active" data-api="unlimplay">Server 1</button>
+            <button class="api-btn" data-api="vidsrc">Server 2</button>
+          </div>
+        </div>
+
+        <!-- BANNER (fondo y logo) -->
+        <div id="player-banner" class="player-banner">
+          <div id="player-banner-backdrop" class="player-banner-backdrop"></div>
+          <div class="player-banner-gradient"></div>
+          <div class="player-banner-content">
+            <img id="player-banner-logo" class="player-banner-logo" src="" alt="">
+          </div>
+        </div>
+
+        <!-- Contenedor del iframe (video) -->
         <div class="player-iframe-wrapper" id="player-iframe-wrapper" style="display: none;">
           <div id="player-iframe-loading" class="player-iframe-loading">
             <div class="spinner"></div>
           </div>
           <iframe id="player-iframe" src="" allowfullscreen></iframe>
         </div>
-        <!-- Información compacta (título, año, duración, sinopsis) -->
+
+        <!-- INFORMACIÓN COMPACTA (título, metadatos, botones, sinopsis) -->
         <div class="player-info-compact">
-          <h2 class="player-title" id="player-title"></h2>
-          <div class="player-meta" id="player-meta">
-            <span class="player-year"></span>
-            <span class="player-duration"></span>
+          <div class="player-info-header">
+            <h2 class="player-title" id="player-title"></h2>
+            <div class="player-meta" id="player-meta">
+              <span class="player-year" id="player-info-year"></span>
+              <span class="player-duration" id="player-info-duration"></span>
+              <span class="player-genre" id="player-info-genre"></span>
+              <span class="player-episode" id="player-info-episode" style="display:none;"></span>
+            </div>
+          </div>
+          <div class="player-actions">
+            <button id="player-fav-btn" class="player-fav-btn">+</button>
+            <button id="player-play-btn-main" class="player-play-btn">▶ Reproducir</button>
           </div>
           <p class="player-synopsis" id="player-synopsis"></p>
-          <div class="player-fav-container" id="player-fav-container">
-        <button id="player-fav-btn" class="player-fav-btn">♡ Agregar a Favoritos</button>
-    </div>
         </div>
-      </div>
 
-      <!-- Columna derecha: episodios y relacionados -->
-      <div class="player-right">
-        <!-- Controles de serie (selector de temporada + lista de episodios) -->
+        <!-- CONTROLES DE TEMPORADA Y EPISODIOS (movido aquí) -->
         <div class="player-episode-controls" id="player-episode-controls" style="display: none;">
           <div class="season-selector">
-            <label for="season-select">Temporada</label>
             <select id="season-select"></select>
           </div>
-          <div class="episodes-list" id="episodes-scroll">
-            <!-- Los botones de capítulos se generarán dinámicamente -->
-          </div>
-        </div>
-        <!-- Relacionados (recomendaciones) -->
-        <div class="player-related" id="player-related">
-          <h3>Relacionados</h3>
-          <div class="related-grid" id="related-grid"></div>
+          <div class="episodes-list" id="episodes-scroll"></div>
         </div>
       </div>
     </div>
