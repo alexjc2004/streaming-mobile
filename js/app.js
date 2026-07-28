@@ -30,9 +30,136 @@ let currentModalData = null; // { tmdbId, mediaType, title, seasons, episodes, .
 let currentSeason = null;
 let currentEpisode = null;
 let isPlayerVisible = false; // si el iframe está visible
+let isBannerVisible = true;
 const bannerStates = {};
 
 
+// ===== ACTUALIZAR BANNER (SOLO FONDO Y LOGO) =====
+function updatePlayerBanner(data) {
+    const backdrop = document.getElementById('player-banner-backdrop');
+    const logoImg = document.getElementById('player-banner-logo');
+
+    // Fondo
+    if (data.background) {
+        backdrop.style.backgroundImage = `url('${data.background}')`;
+    } else if (data.posterPath) {
+        backdrop.style.backgroundImage = `url('${data.posterPath}')`;
+    } else {
+        backdrop.style.backgroundImage = 'none';
+        backdrop.style.backgroundColor = '#1a1a2e';
+    }
+
+    // Logo
+    if (data.titleImage) {
+        logoImg.src = data.titleImage;
+        logoImg.style.display = 'block';
+    } else {
+        logoImg.style.display = 'none';
+    }
+}
+
+// ===== ACTUALIZAR INFORMACIÓN COMPACTA (TÍTULO, METADATOS, BOTONES) =====
+function updatePlayerInfo(data) {
+    // Título
+    const titleEl = document.getElementById('player-title');
+    if (titleEl) {
+        let displayTitle = data.title || 'Sin título';
+        const isSeries = (data.mediaType === 'tv' || data.mediaType === 'anime');
+        if (isSeries && currentSeason !== null && currentEpisode !== null) {
+            displayTitle = `${displayTitle} - T${currentSeason} E${currentEpisode}`;
+        }
+        titleEl.textContent = displayTitle;
+    }
+
+    // Sinopsis
+    const synopsisEl = document.getElementById('player-synopsis');
+    if (synopsisEl) {
+        synopsisEl.textContent = data.overview || 'Sin sinopsis disponible';
+    }
+
+    // --- Metadatos con separadores ---
+    const metaContainer = document.getElementById('player-meta');
+    if (!metaContainer) return;
+
+    let parts = [];
+
+    // Año
+    if (data.year) {
+        parts.push(`<span class="player-year">${data.year}</span>`);
+    }
+
+    // Duración o episodios
+    if (data.duration) {
+        parts.push(`<span class="player-duration">${data.duration}</span>`);
+    }
+
+    // Género (primer género o todos)
+    let genreText = data.genre || '';
+    // Si no hay genre en data pero hay genreIds, intentar obtenerlos
+    if (!genreText && data.genreIds) {
+        const genreNames = getGenreNamesFromIds(data.genreIds, data.mediaType);
+        if (genreNames) {
+            genreText = genreNames.split(',')[0]; // Tomar el primero
+        }
+    }
+    if (genreText) {
+        parts.push(`<span class="player-genre">${genreText}</span>`);
+    }
+
+    // Episodio (solo si es serie y está seleccionado)
+    if (currentSeason !== null && currentEpisode !== null) {
+        parts.push(`<span class="player-episode" id="player-info-episode">T${currentSeason} E${currentEpisode}</span>`);
+    }
+
+    // Unir con separadores
+    const separator = '<span class="meta-separator">∣</span>';
+    metaContainer.innerHTML = parts.join(separator);
+
+    // Botones
+    updatePlayerFavButton();
+    updatePlayButtonText();
+}
+
+// ===== BOTÓN DE FAVORITOS (NUEVO ID) =====
+function updatePlayerFavButton() {
+    const favBtn = document.getElementById('player-fav-btn');
+    if (!favBtn || !currentModalData) return;
+    const tmdbId = currentModalData.tmdbId;
+    const mediaType = currentModalData.mediaType;
+    const title = currentModalData.title;
+    const isFav = isFavorite(tmdbId, mediaType, title);
+    favBtn.textContent = isFav ? '✓' : '+';
+    favBtn.classList.toggle('active', isFav);
+}
+
+// ===== BOTÓN DE REPRODUCCIÓN (NUEVO ID) =====
+function updatePlayButtonText() {
+    const playBtn = document.getElementById('player-play-btn-main');
+    if (!playBtn || !currentModalData) return;
+    const { tmdbId, mediaType, title } = currentModalData;
+    const progress = getProgress(tmdbId, mediaType);
+
+    if (mediaType === 'movie') {
+        playBtn.textContent = (progress && progress.watched) ? '▶ Continuar viendo' : '▶ Reproducir';
+    } else if (mediaType === 'tv' || mediaType === 'anime') {
+        // Si hay un episodio seleccionado (currentSeason y currentEpisode no son null)
+        if (currentSeason !== null && currentEpisode !== null) {
+            // Verificar si el progreso coincide con este episodio
+            if (progress && progress.season === currentSeason && progress.episode === currentEpisode) {
+                playBtn.textContent = `▶ Continuar (T${currentSeason} E${currentEpisode})`;
+            } else {
+                playBtn.textContent = `▶ Ver capítulo ${currentEpisode}`;
+            }
+        } else {
+            // No hay episodio seleccionado (puede pasar si no se cargaron aún)
+            if (progress && progress.season !== undefined && progress.episode !== undefined) {
+                playBtn.textContent = `▶ Continuar (T${progress.season} E${progress.episode})`;
+            } else {
+                playBtn.textContent = '▶ Reproducir';
+            }
+        }
+    }
+}
 function loadBannerCarousel(containerId, slidesData) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -713,6 +840,18 @@ async function getAnimeEmbedUrl(episodeUrl) {
     }
 }
 
+function updateControlsBarBackground() {
+  const bar = document.getElementById('player-controls-bar');
+  if (!bar) return;
+  if (isBannerVisible) {
+    bar.classList.remove('solid-bg');
+    bar.classList.add('absolute-bar');
+  } else {
+    bar.classList.add('solid-bg');
+    bar.classList.remove('absolute-bar');
+  }
+}
+
 // Función auxiliar para obtener detalles de la serie (temporadas y episodios)
 async function getSeriesDetails(tmdbId) {
     try {
@@ -755,8 +894,7 @@ async function openPlayerModal(data) {
     if (episodesScroll) episodesScroll.innerHTML = '';
     const seasonSelect = document.getElementById('season-select');
     if (seasonSelect) seasonSelect.innerHTML = '';
-    const relatedGrid = document.getElementById('related-grid');
-    if (relatedGrid) relatedGrid.innerHTML = '';
+
 
     currentSeason = null;
     currentEpisode = null;
@@ -764,39 +902,62 @@ async function openPlayerModal(data) {
     currentApi = 'unlimplay';
 
     // --- 2. Si falta información, obtenerla de TMDB ---
-    if (data.tmdbId && (!data.overview || !data.year || !data.duration)) {
-        try {
-            const endpoint = data.mediaType === 'movie' ? 'movie' : 'tv';
-            const url = `https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}?api_key=${API_KEY}&language=es-ES`;
-            const response = await fetch(url);
-            const tmdbData = await response.json();
-            
-            if (!data.overview) data.overview = tmdbData.overview || 'Sin sinopsis disponible';
-            if (!data.year) {
-                const date = tmdbData.release_date || tmdbData.first_air_date;
-                data.year = date ? date.split('-')[0] : '';
-            }
-            if (!data.duration) {
-                if (data.mediaType === 'movie') {
-                    data.duration = formatRuntime(tmdbData.runtime);
-                } else {
-                    const episodes = tmdbData.number_of_episodes || '?';
-                    data.duration = `${episodes} episodios`;
-                }
-            }
-            // Si no hay poster, usar el de TMDB
-            if (!data.posterPath && tmdbData.poster_path) {
-                data.posterPath = `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`;
-            }
-            // Guardar los datos actualizados
-            currentModalData = data;
-        } catch (error) {
-            console.warn('No se pudieron obtener detalles de TMDB:', error);
-        }
-    }
+    if (data.tmdbId && (!data.overview || !data.year || !data.duration || !data.background || !data.titleImage)) {
+    try {
+        const endpoint = data.mediaType === 'movie' ? 'movie' : 'tv';
+        const url = `https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}?api_key=${API_KEY}&language=es-ES`;
+        const response = await fetch(url);
+        const tmdbData = await response.json();
 
-    // --- 3. Guardar los datos recibidos (ya actualizados) ---
-    currentModalData = data;
+        if (!data.overview) data.overview = tmdbData.overview || 'Sin sinopsis disponible';
+        if (!data.year) {
+            const date = tmdbData.release_date || tmdbData.first_air_date;
+            data.year = date ? date.split('-')[0] : '';
+        }
+        if (!data.duration) {
+            if (data.mediaType === 'movie') {
+                data.duration = formatRuntime(tmdbData.runtime);
+            } else {
+                const episodes = tmdbData.number_of_episodes || '?';
+                data.duration = `${episodes} episodios`;
+            }
+        }
+        // Si no hay poster, usar el de TMDB
+        if (!data.posterPath && tmdbData.poster_path) {
+            data.posterPath = `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`;
+        }
+        // Obtener backdrop
+        if (!data.background && tmdbData.backdrop_path) {
+            data.background = `https://image.tmdb.org/t/p/w1280${tmdbData.backdrop_path}`;
+        }
+        // Obtener logo (titleImage)
+        if (!data.titleImage) {
+            try {
+                const imagesRes = await fetchWithRetry(`https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}/images?api_key=${API_KEY}&include_image_language=es,en,null`);
+                const logos = imagesRes.logos || [];
+                let logo = logos.find(l => l.iso_639_1 === 'es') || logos.find(l => l.iso_639_1 === 'en') || logos[0];
+                if (logo) {
+                    data.titleImage = `https://image.tmdb.org/t/p/w500${logo.file_path}`;
+                }
+            } catch (e) {
+                // Si falla la obtención de logos, continuar sin logo
+            }
+        }
+        // Guardar los datos actualizados
+        currentModalData = data;
+
+        // Obtener géneros
+        if (tmdbData.genres && tmdbData.genres.length > 0) {
+            data.genre = tmdbData.genres.map(g => g.name).join(', ');
+        } else if (data.genreIds) {
+            const genreNames = getGenreNamesFromIds(data.genreIds, data.mediaType);
+            if (genreNames) data.genre = genreNames;
+        }
+
+    } catch (error) {
+        console.warn('No se pudieron obtener detalles de TMDB:', error);
+    }
+}
 
     // --- 4. Actualizar la interfaz con la información básica ---
     const titleEl = document.getElementById('player-title');
@@ -849,22 +1010,25 @@ async function openPlayerModal(data) {
         episodeControls.style.display = 'none';
     }
 
-    // --- 6. Cargar contenido relacionado ---
-    if (data.tmdbId) {
-        loadRelatedContent(data.tmdbId, data.mediaType);
-    }
-
     // --- 7. Mostrar el modal ---
     modal.style.display = 'flex';
     modal.classList.remove('fullscreen');
     disableMainScroll();
 
+    // Mostrar banner, ocultar iframe
+    isBannerVisible = true;
+    updateControlsBarBackground();
+    document.getElementById('player-banner').style.display = 'flex';
+    document.getElementById('player-iframe-wrapper').style.display = 'none';
+    updatePlayerBanner(data);
+    updatePlayerInfo(data);
+
     // --- 8. Reproducir automáticamente ---
-    setTimeout(() => {
-        playCurrentEpisode();
-    }, 150);
+    updatePlayButtonText();
+    
 
     updatePlayerFavButton();
+    updatePlayButtonText();
 }
 
 function updatePlayerTitle() {
@@ -934,11 +1098,11 @@ function renderEpisodes(seasonIndex, data) {
             if (this.dataset.url) {
                 currentModalData.animeEpisodeUrl = this.dataset.url;
             }
-            if (currentModalData.tmdbId) {
-                saveProgress(currentModalData.tmdbId, currentModalData.mediaType, currentSeason, currentEpisode);
-            }
+            // Actualizar el texto del botón de reproducción
+            updatePlayButtonText();
+            // Si el iframe ya está visible, recargar el episodio (iniciado por el usuario)
             if (isPlayerVisible) {
-                playCurrentEpisode();
+                playCurrentEpisode(true);
             }
         });
         episodesScroll.appendChild(btn);
@@ -971,7 +1135,7 @@ function renderEpisodes(seasonIndex, data) {
     updatePlayerTitle();
 }
 
-function playCurrentEpisode() {
+function playCurrentEpisode(userInitiated = true) {
     if (!currentModalData) {
         console.warn('No hay contenido seleccionado.');
         return;
@@ -999,8 +1163,11 @@ function playCurrentEpisode() {
     const iframe = document.getElementById('player-iframe');
     const loadingEl = document.getElementById('player-iframe-loading');
 
-    // Asegurar que el iframe esté visible
-    iframeWrapper.style.display = 'block';
+    if (!isBannerVisible) {
+        iframeWrapper.style.display = 'block';
+    } else {
+        iframeWrapper.style.display = 'none';
+    }
     if (loadingEl) loadingEl.classList.remove('hidden');
 
     const api = currentApi;
@@ -1013,9 +1180,10 @@ function playCurrentEpisode() {
                 if (embed) {
                     iframe.src = embed;
                     isPlayerVisible = true;
-                    // Guardar progreso
-                    saveProgress(currentModalData.tmdbId, 'anime', null, currentEpisode);
-                    addToRecent(currentModalData.tmdbId, 'anime', currentModalData.title, currentModalData.posterPath, currentModalData.originalLang);
+                    if (userInitiated) {
+                        saveProgress(currentModalData.tmdbId, 'anime', null, currentEpisode);
+                        addToRecent(currentModalData.tmdbId, 'anime', currentModalData.title, currentModalData.posterPath, currentModalData.originalLang);
+                    }
                     setupIframeLoading(iframe, loadingEl);
                     updatePlayerTitle();
                     const synopsisEl = document.getElementById('player-synopsis');
@@ -1034,14 +1202,12 @@ function playCurrentEpisode() {
                 } else {
                     console.warn('No se pudo obtener embed de AnimeAV1');
                     loadingEl.classList.add('hidden');
-                    // Intentar con UnlimPlay como fallback
-                    tryFallbackUnlimPlay();
+                    tryFallbackUnlimPlay(iframe, loadingEl, userInitiated);
                 }
             });
             return;
         } else {
-            // Si no hay URL de AnimeAV1, intentar con UnlimPlay
-            tryFallbackUnlimPlay();
+            tryFallbackUnlimPlay(iframe, loadingEl, userInitiated);
             return;
         }
     }
@@ -1052,24 +1218,22 @@ function playCurrentEpisode() {
             url = buildPlayerUrl(api, currentModalData.tmdbId, 'tv', currentSeason, currentEpisode);
         }
     } else {
-        // Películas o series normales
         url = buildPlayerUrl(api, currentModalData.tmdbId, currentModalData.mediaType, currentSeason, currentEpisode);
     }
 
     if (url) {
         iframe.src = url;
-       
         isPlayerVisible = true;
-        // Guardar progreso
-        if (currentModalData.tmdbId) {
-            if (currentModalData.mediaType === 'movie') {
-                saveProgress(currentModalData.tmdbId, 'movie');
-            } else {
-                saveProgress(currentModalData.tmdbId, currentModalData.mediaType, currentSeason, currentEpisode);
+        if (userInitiated) {
+            if (currentModalData.tmdbId) {
+                if (currentModalData.mediaType === 'movie') {
+                    saveProgress(currentModalData.tmdbId, 'movie');
+                } else {
+                    saveProgress(currentModalData.tmdbId, currentModalData.mediaType, currentSeason, currentEpisode);
+                }
+                addToRecent(currentModalData.tmdbId, currentModalData.mediaType, currentModalData.title, currentModalData.posterPath, currentModalData.originalLang);
             }
-            addToRecent(currentModalData.tmdbId, currentModalData.mediaType, currentModalData.title, currentModalData.posterPath, currentModalData.originalLang);
         }
-        // Actualizar currentPlayerData
         currentPlayerData = {
             tmdbId: currentModalData.tmdbId,
             mediaType: currentModalData.mediaType,
@@ -1081,50 +1245,39 @@ function playCurrentEpisode() {
             animeEpisodeUrl: currentModalData.animeEpisodeUrl
         };
         setupIframeLoading(iframe, loadingEl);
-        updatePlayerTitle();  // <--- AÑADIR AQUÍ
+        updatePlayerTitle();
+        updatePlayerInfo(currentModalData);
     } else {
         console.warn('No se pudo construir la URL para la API seleccionada.');
         loadingEl.classList.add('hidden');
-        // Intentar con fallback
-        tryFallbackUnlimPlay();
+        tryFallbackUnlimPlay(iframe, loadingEl, userInitiated);
     }
-}
-
-function updatePlayerFavButton() {
-    const favBtn = document.getElementById('player-fav-btn');
-    if (!favBtn || !currentModalData) return;
-    const tmdbId = currentModalData.tmdbId;
-    const mediaType = currentModalData.mediaType;
-    const title = currentModalData.title;
-    const isFav = isFavorite(tmdbId, mediaType, title);
-    favBtn.textContent = isFav ? '♥ Quitar de Favoritos' : '♡ Agregar a Favoritos';
-    favBtn.classList.toggle('active', isFav);
 }
 
     // Función interna para intentar UnlimPlay como fallback
-    function tryFallbackUnlimPlay() {
-        if (currentModalData.tmdbId && currentModalData.mediaType === 'anime') {
-            const fallbackUrl = buildPlayerUrl('unlimplay', currentModalData.tmdbId, 'tv', currentSeason, currentEpisode);
-            if (fallbackUrl) {
-                iframe.src = fallbackUrl;
-                isPlayerVisible = true;
+function tryFallbackUnlimPlay(iframe, loadingEl, userInitiated = true) {
+    if (currentModalData.tmdbId && currentModalData.mediaType === 'anime') {
+        const fallbackUrl = buildPlayerUrl('unlimplay', currentModalData.tmdbId, 'tv', currentSeason, currentEpisode);
+        if (fallbackUrl) {
+            iframe.src = fallbackUrl;
+            isPlayerVisible = true;
+            if (userInitiated) {
                 saveProgress(currentModalData.tmdbId, 'tv', currentSeason, currentEpisode);
                 addToRecent(currentModalData.tmdbId, 'tv', currentModalData.title, currentModalData.posterPath, currentModalData.originalLang);
-                setupIframeLoading(iframe, loadingEl);
-                updatePlayerTitle();
-                return;
             }
-        }
-        // Si todo falla, simplemente ocultamos el spinner y mostramos un mensaje en consola
-        loadingEl.classList.add('hidden');
-        console.warn('No se pudo cargar el episodio con ninguna fuente.');
-        // Opcional: mostrar un mensaje sutil en la interfaz
-        const synopsisEl = document.getElementById('player-synopsis');
-        if (synopsisEl) {
-            synopsisEl.textContent = 'No se pudo cargar el video. Intenta con otra fuente.';
-            synopsisEl.style.color = '#ff6b6b';
+            setupIframeLoading(iframe, loadingEl);
+            updatePlayerTitle();
+            return;
         }
     }
+    if (loadingEl) loadingEl.classList.add('hidden');
+    console.warn('No se pudo cargar el episodio con ninguna fuente.');
+    const synopsisEl = document.getElementById('player-synopsis');
+    if (synopsisEl) {
+        synopsisEl.textContent = 'No se pudo cargar el video. Intenta con otra fuente.';
+        synopsisEl.style.color = '#ff6b6b';
+    }
+}
 
 
 // Función auxiliar para gestionar la carga del iframe
@@ -1740,9 +1893,6 @@ async function playAnimeEpisode(episodeUrl) {
     `;
     document.getElementById('player-synopsis').textContent = currentMovieData?.overview || '';
 
-    // Limpiar relacionados
-    const relatedGrid = document.getElementById('related-grid');
-    if (relatedGrid) relatedGrid.innerHTML = '';
 
     // Establecer API actual como animeav1
     currentApi = 'animeav1';
@@ -2353,6 +2503,7 @@ async function loadDynamicRow(endpoint, rowId, categoryTitle, parentContainerId 
                     posterPath: posterUrl,
                     year: year,
                     duration: '',
+                    genreIds: genreIds,
                     overview: overview,
                     // Para series, necesitas obtener las temporadas y episodios
                     // Puedes cargarlos bajo demanda dentro de openPlayerModal
@@ -2786,6 +2937,7 @@ async function showMovieInfo(tmdbId, mediaType, title, originalLang, posterUrl) 
             posterPath: tmdbData.poster_path || '',
             year: year,
             duration: durationText,
+            genre: tmdbData.genres ? tmdbData.genres.map(g => g.name).join(', ') : '',
             overview: tmdbData.overview || '',
             isAnime: isAnime,
         };
@@ -3120,23 +3272,7 @@ function switchPlayerApi(api) {
         playCurrentEpisode();
     }
 }
-// Función para cerrar el reproductor modal
-function closePlayerModal() {
-    const modal = document.getElementById('player-modal');
-    const iframe = document.getElementById('player-iframe');
-    iframe.src = ''; // detener carga
-    modal.style.display = 'none';
-    modal.classList.remove('fullscreen');
-    enableMainScroll();
 
-    // Si había una ventana de información abierta, restaurarla (opcional)
-    if (currentMovieData) {
-        // Puedes reabrir la info o simplemente volver a la pestaña activa
-        // Aquí decidimos volver a la pestaña anterior:
-        const activeTab = document.querySelector('.tab-btn.active');
-        if (activeTab) switchTab(activeTab.dataset.tab);
-    }
-}
 
 // Detener y eliminar el tráiler
 function clearTrailer() {
@@ -3562,10 +3698,12 @@ function loadRecentRow() {
 function isFavorite(tmdbId, mediaType, title) {
     const favorites = JSON.parse(localStorage.getItem('favorites')) || [];
     return favorites.some(item => {
-        // Si tenemos tmdbId, buscar por tmdbId
+        // Si tenemos tmdbId, buscar por tmdbId y mediaType
         if (tmdbId && item.tmdbId === tmdbId && item.mediaType === mediaType) return true;
-        // Si no hay tmdbId, buscar por título (para animes sin ID)
+        // Si no hay tmdbId (anime), buscar por título y mediaType
         if (!tmdbId && item.title === title && item.mediaType === mediaType) return true;
+        // También si el tmdbId del item es null y el título coincide
+        if (item.tmdbId === null && item.title === title && item.mediaType === mediaType) return true;
         return false;
     });
 }
@@ -3620,23 +3758,28 @@ function closePlayerModal() {
         });
     }
 
-    
     iframe.src = '';
     modal.style.display = 'none';
     modal.classList.remove('fullscreen');
     enableMainScroll();
 
-    // Volver a la ventana de información (en lugar de ir al inicio)
+    // Restaurar banner
+    const banner = document.getElementById('player-banner');
+    banner.style.display = 'flex';
+    banner.style.opacity = '1';
+    isBannerVisible = true;
+    updateControlsBarBackground();
+    document.getElementById('player-iframe-wrapper').style.display = 'none';
+
+    // Volver a la ventana de información o a la pestaña anterior
     if (currentMovieData) {
-        // Reabrir la info (depende de tu lógica)
         showMovieInfo(currentMovieData.tmdbId, currentMovieData.mediaType, currentMovieData.title, currentMovieData.originalLang, currentMovieData.posterPath);
-        // O si quieres mantener el estado, puedes simplemente reabrir la información.
     } else {
         const activeTab = document.querySelector('.tab-btn.active');
         if (activeTab) switchTab(activeTab.dataset.tab);
     }
-        document.querySelectorAll('.api-btn').forEach(btn => {
-        btn.style.display = ''; // restaurar display por defecto
+    document.querySelectorAll('.api-btn').forEach(btn => {
+        btn.style.display = '';
     });
 }
 
@@ -3894,17 +4037,32 @@ function initApp() {
 
     // ========== REPRODUCTOR MODAL ==========
     function initPlayerControls() {
-        const playBtn = document.getElementById('player-play-btn');
-        if (playBtn) {
-            playBtn.addEventListener('click', playCurrentEpisode);
-        }
+    const playBtn = document.getElementById('player-play-btn-main');
+    if (playBtn) {
+        playBtn.addEventListener('click', function() {
+            if (!currentModalData) return;
+            // Ocultar banner y mostrar iframe
+            const banner = document.getElementById('player-banner');
+            banner.style.transition = 'opacity 0.5s ease';
+            banner.style.opacity = '0';
+            isBannerVisible = false;
+            setTimeout(() => {
+                banner.style.display = 'none';
+                isBannerVisible = false;
+                updateControlsBarBackground(); // <--- añadir
+                document.getElementById('player-iframe-wrapper').style.display = 'block';
+                playCurrentEpisode();
+            }, 500);
+        });
+    }
+
+        // Botón Volver
         const backBtn = document.getElementById('player-back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', closePlayerModal);
-        } else {
-            console.warn('⚠️ No se encontró #player-back-btn');
         }
 
+        
         const apiBtns = document.querySelectorAll('.api-btn');
         if (apiBtns.length > 0) {
             apiBtns.forEach(btn => {
@@ -3945,17 +4103,14 @@ function initApp() {
             console.warn('⚠️ No se encontró #player-fullscreen-btn');
         }
 
-        const playerFavBtn = document.getElementById('player-fav-btn');
-        if (playerFavBtn) {
-            playerFavBtn.addEventListener('click', function() {
+        // Botón favoritos (único)
+        const favBtn = document.getElementById('player-fav-btn');
+        if (favBtn) {
+            favBtn.addEventListener('click', function() {
                 if (!currentModalData) return;
                 const { tmdbId, mediaType, title, originalLang, posterPath } = currentModalData;
-                if (tmdbId || title) {
-                    toggleFavorite(tmdbId, mediaType, title, posterPath || '', originalLang || '');
-                    updatePlayerFavButton(); // Actualiza el botón del modal
-                } else {
-                    alert('No se puede agregar a favoritos: falta título o ID.');
-                }
+                toggleFavorite(tmdbId, mediaType, title, posterPath || '', originalLang || '');
+                // toggleFavorite ya actualiza los botones, no es necesario llamar aquí a updatePlayerFavButton
             });
         }
 
