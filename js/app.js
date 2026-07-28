@@ -30,6 +30,264 @@ let currentModalData = null; // { tmdbId, mediaType, title, seasons, episodes, .
 let currentSeason = null;
 let currentEpisode = null;
 let isPlayerVisible = false; // si el iframe está visible
+const bannerStates = {};
+
+
+function loadBannerCarousel(containerId, slidesData) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (slidesData.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'block';
+
+    // Inicializar estado para este contenedor
+    if (!bannerStates[containerId]) {
+        bannerStates[containerId] = {
+            currentIndex: 0,
+            slides: [],
+            interval: null,
+            isTransitioning: false
+        };
+    }
+    const state = bannerStates[containerId];
+    state.slides = slidesData;
+    state.currentIndex = 0;
+
+    // Limpiar track
+    const track = container.querySelector('.banner-track');
+    track.innerHTML = '';
+
+    // Crear slides
+    slidesData.forEach((item, index) => {
+        const slide = document.createElement('div');
+        slide.className = 'banner-slide';
+        slide.dataset.index = index;
+        // Fondo
+        if (item.background) {
+            slide.style.backgroundImage = `url('${item.background}')`;
+        } else {
+            // Si no hay fondo, usar un color oscuro por defecto
+            slide.style.backgroundColor = '#1a1a2e';
+        }
+        
+        // Título (imagen o texto)
+        if (item.titleImage) {
+            const img = document.createElement('img');
+            img.src = item.titleImage;
+            img.alt = item.title;
+            img.className = 'banner-title-img';
+            slide.appendChild(img);
+        } else {
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'banner-title-text';
+            titleDiv.textContent = item.title;
+            slide.appendChild(titleDiv);
+        }
+        
+        slide.addEventListener('click', () => {
+            if (item.tmdbId && item.mediaType) {
+                const data = {
+                    tmdbId: item.tmdbId,
+                    mediaType: item.mediaType,
+                    title: item.title,
+                    originalLang: item.originalLang || 'es',
+                    posterPath: item.posterPath || '',
+                    year: item.year || '',
+                    duration: item.duration || '',
+                    overview: item.overview || ''
+                };
+                openPlayerModal(data);
+            }
+        });
+        track.appendChild(slide);
+    });
+
+    // Actualizar posiciones
+    updateBannerSlides(containerId);
+
+    // Dots
+    const dotsContainer = container.querySelector('.banner-dots');
+    dotsContainer.innerHTML = '';
+    slidesData.forEach((_, idx) => {
+        const dot = document.createElement('span');
+        dot.className = 'banner-dot' + (idx === 0 ? ' active' : '');
+        dot.addEventListener('click', () => goToBannerSlide(containerId, idx));
+        dotsContainer.appendChild(dot);
+    });
+
+    // Controles
+    const prevBtn = container.querySelector('.banner-prev');
+    const nextBtn = container.querySelector('.banner-next');
+    // Remover listeners antiguos (clonar o usar event listeners con referencia)
+    // Para simplificar, usamos funciones anónimas y las reemplazamos cada vez.
+    prevBtn.onclick = () => prevBannerSlide(containerId);
+    nextBtn.onclick = () => nextBannerSlide(containerId);
+
+    // Iniciar rotación automática
+    startBannerAutoPlay(containerId);
+}
+
+function updateBannerSlides(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const slides = container.querySelectorAll('.banner-slide');
+    const total = slides.length;
+    const state = bannerStates[containerId];
+    if (!state) return;
+    const current = state.currentIndex;
+
+    slides.forEach((slide, index) => {
+        slide.classList.remove('active', 'left', 'right', 'left-far', 'right-far');
+        let diff = (index - current + total) % total;
+        if (diff === 0) {
+            slide.classList.add('active');
+        } else if (diff === 1) {
+            slide.classList.add('right');
+        } else if (diff === total - 1) {
+            slide.classList.add('left');
+        } else if (diff === 2 || diff === 3) {
+            slide.classList.add('right-far');
+        } else {
+            slide.classList.add('left-far');
+        }
+    });
+
+    // Actualizar dots
+    const dots = container.querySelectorAll('.banner-dot');
+    dots.forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === current);
+    });
+}
+
+function goToBannerSlide(containerId, index) {
+    const state = bannerStates[containerId];
+    if (!state) return;
+    if (state.isTransitioning) return;
+    if (index === state.currentIndex) return;
+    state.isTransitioning = true;
+    state.currentIndex = index;
+    updateBannerSlides(containerId);
+    setTimeout(() => {
+        state.isTransitioning = false;
+    }, 600);
+    resetBannerAutoPlay(containerId);
+}
+
+function nextBannerSlide(containerId) {
+    const state = bannerStates[containerId];
+    if (!state) return;
+    const total = state.slides.length;
+    const next = (state.currentIndex + 1) % total;
+    goToBannerSlide(containerId, next);
+}
+
+function prevBannerSlide(containerId) {
+    const state = bannerStates[containerId];
+    if (!state) return;
+    const total = state.slides.length;
+    const prev = (state.currentIndex - 1 + total) % total;
+    goToBannerSlide(containerId, prev);
+}
+
+function startBannerAutoPlay(containerId) {
+    const state = bannerStates[containerId];
+    if (!state) return;
+    if (state.interval) clearInterval(state.interval);
+    state.interval = setInterval(() => {
+        nextBannerSlide(containerId);
+    }, 5000);
+}
+
+function resetBannerAutoPlay(containerId) {
+    const state = bannerStates[containerId];
+    if (!state) return;
+    if (state.interval) {
+        clearInterval(state.interval);
+        startBannerAutoPlay(containerId);
+    }
+}
+
+async function loadBannerCarouselFromTMDB(containerId, endpoint = '/movie/popular', mediaType = 'movie', fallbackEndpoint = null) {
+    try {
+        // Construir URL
+        const separator = endpoint.includes('?') ? '&' : '?';
+        const url = `https://api.themoviedb.org/3${endpoint}${separator}api_key=${API_KEY}&language=es-ES`;
+        const data = await fetchWithRetry(url);
+        let results = data.results || [];
+
+        // Si es anime, filtrar para asegurar que sean japoneses y de género animación
+        if (mediaType === 'tv' && endpoint.includes('discover')) {
+            results = results.filter(item => 
+                item.original_language === 'ja' && 
+                item.genre_ids && item.genre_ids.includes(16)
+            );
+        }
+
+        // Si no hay resultados y hay fallback, intentar con fallback
+        if (results.length === 0 && fallbackEndpoint) {
+            console.warn(`⚠️ No hay resultados para ${endpoint}, usando fallback: ${fallbackEndpoint}`);
+            return loadBannerCarouselFromTMDB(containerId, fallbackEndpoint, mediaType, null);
+        }
+
+        const shuffled = results.sort(() => Math.random() - 0.5).slice(0, 10);
+        const slides = [];
+        for (const item of shuffled) {
+            const id = item.id;
+            const title = item.title || item.name;
+            const originalLang = item.original_language || 'es';
+            const backdrop = item.backdrop_path ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}` : '';
+            const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : '';
+            const year = (item.release_date || item.first_air_date || '').split('-')[0] || '';
+            const overview = item.overview || '';
+
+            // Intentar obtener logo
+            let logoUrl = '';
+            try {
+                const imagesRes = await fetchWithRetry(`https://api.themoviedb.org/3/${mediaType}/${id}/images?api_key=${API_KEY}&include_image_language=es,en,null`);
+                const logos = imagesRes.logos || [];
+                let logo = logos.find(l => l.iso_639_1 === 'es') || logos.find(l => l.iso_639_1 === 'en') || logos[0];
+                if (logo) logoUrl = `https://image.tmdb.org/t/p/w500${logo.file_path}`;
+            } catch (e) {
+                // Si falla la obtención de logos, continuar sin logo
+            }
+
+            const bgImage = backdrop || poster;
+
+            slides.push({
+                background: bgImage,
+                titleImage: logoUrl,
+                title: title,
+                tmdbId: id,
+                mediaType: mediaType,
+                originalLang: originalLang,
+                posterPath: poster,
+                year: year,
+                overview: overview,
+                hasLogo: !!logoUrl
+            });
+
+            if (slides.length >= 5) break;
+        }
+
+        if (slides.length === 0) {
+            // Si aún no hay slides, ocultar
+            document.getElementById(containerId).style.display = 'none';
+            return;
+        }
+
+        loadBannerCarousel(containerId, slides);
+    } catch (error) {
+        console.error('Error cargando banner carousel desde TMDB:', error);
+        // Si hay fallback, intentar con él
+        if (fallbackEndpoint) {
+            console.warn(`⚠️ Error con ${endpoint}, usando fallback: ${fallbackEndpoint}`);
+            return loadBannerCarouselFromTMDB(containerId, fallbackEndpoint, mediaType, null);
+        }
+        document.getElementById(containerId).style.display = 'none';
+    }
+}
 
 function getRecentLabel(item) {
     if (item.mediaType === 'movie') return 'Película';
@@ -62,171 +320,6 @@ function getGenreNamesFromIds(ids, mediaType) {
     const map = mediaType === 'movie' ? genreMapMovie : genreMapTv;
     return ids.map(id => map[id] || '').filter(Boolean).join(', ');
 }
-
-// ==================== CARRUSEL MIXTO PARA INICIO ====================
-async function loadHeroCarouselFromData(containerId, slidesData, defaultMediaType = 'movie') {
-    const heroContainer = document.getElementById(containerId);
-    if (!heroContainer) return;
-    if (slidesData.length === 0) return;
-
-    // Limpiar slides excepto el primero
-    const slides = heroContainer.querySelectorAll('.hero-slide');
-    for (let i = slides.length - 1; i > 0; i--) {
-        slides[i].remove();
-    }
-    const baseSlide = heroContainer.querySelector('.hero-slide');
-
-    // Actualizar primer slide y crear los demás
-    await updateSlideContent(baseSlide, slidesData[0], 0, slidesData[0].mediaType || defaultMediaType);
-    for (let i = 1; i < slidesData.length; i++) {
-        const newSlide = baseSlide.cloneNode(true);
-        newSlide.classList.remove('active');
-        await updateSlideContent(newSlide, slidesData[i], i, slidesData[i].mediaType || defaultMediaType);
-        heroContainer.insertBefore(newSlide, heroContainer.querySelector('.carousel-prev'));
-    }
-
-    // Dots
-    const dotsContainer = heroContainer.querySelector('.carousel-dots');
-    dotsContainer.innerHTML = '';
-    slidesData.forEach((_, idx) => {
-        const dot = document.createElement('span');
-        dot.classList.add('dot');
-        if (idx === 0) dot.classList.add('active');
-        dot.addEventListener('click', () => goToSlide(idx, containerId));
-        dotsContainer.appendChild(dot);
-    });
-
-    // Guardar estado
-    const state = getCarouselState(containerId);
-    state.slides = slidesData;
-    state.currentSlide = 0;
-
-    startCarousel(containerId);
-    attachCarouselControls(containerId);
-    loadedCarousels[containerId] = true;
-}
-
-async function loadMixedCarousel() {
-    try {
-        // 1. Películas de acción (género 28) con fecha de estreno entre 6 meses y 2 años atrás
-        const today = new Date();
-        const sixMonthsAgo = new Date(today);
-        sixMonthsAgo.setMonth(today.getMonth() - 6);
-        const twoYearsAgo = new Date(today);
-        twoYearsAgo.setFullYear(today.getFullYear() - 2);
-
-        const formatDate = (d) => d.toISOString().split('T')[0];
-        const actionEndpoint = `/discover/movie?with_genres=28&sort_by=popularity.desc&primary_release_date.gte=${formatDate(twoYearsAgo)}&primary_release_date.lte=${formatDate(sixMonthsAgo)}&page=1`;
-        const actionData = await fetchWithRetry(`https://api.themoviedb.org/3${actionEndpoint}&api_key=${API_KEY}&language=es-ES`);
-        const actionMovies = actionData.results || [];
-
-        // 2. Series de aventura (género 10759) con mismo rango de fechas
-        const adventureEndpoint = `/discover/tv?with_genres=10759&sort_by=popularity.desc&first_air_date.gte=${formatDate(twoYearsAgo)}&first_air_date.lte=${formatDate(sixMonthsAgo)}&page=1`;
-        const adventureData = await fetchWithRetry(`https://api.themoviedb.org/3${adventureEndpoint}&api_key=${API_KEY}&language=es-ES`);
-        const adventureShows = adventureData.results || [];
-
-        // 3. Anime shonen: buscamos animes populares con género 16 (animación) y original_language=ja
-        // y filtramos algunos títulos que suenen a shonen (opcional, o simplemente tomamos uno al azar de los populares)
-        const animeEndpoint = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&page=1`;
-        const animeData = await fetchWithRetry(`https://api.themoviedb.org/3${animeEndpoint}&api_key=${API_KEY}&language=es-ES`);
-        const animes = animeData.results || [];
-
-        // Seleccionar aleatoriamente 2 películas de acción, 2 series de aventura y 1 anime
-        const shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
-        const pickRandom = (arr, n) => shuffleArray(arr).slice(0, n);
-
-        const selectedMovies = pickRandom(actionMovies, 2).map(m => ({ ...m, mediaType: 'movie' }));
-        const selectedShows = pickRandom(adventureShows, 2).map(t => ({ ...t, mediaType: 'tv' }));
-        const selectedAnime = pickRandom(animes, 1).map(a => ({ ...a, mediaType: 'tv' }));
-
-        const slides = [...selectedMovies, ...selectedShows, ...selectedAnime];
-        // Mezclar para variedad
-        shuffleArray(slides);
-
-        if (slides.length === 0) {
-            // Fallback: cargar carrusel genérico
-            loadHeroCarousel('hero-carousel', '/movie/popular', { shuffle: true, limit: 5, mediaType: 'movie' });
-            return;
-        }
-
-        await loadHeroCarouselFromData('hero-carousel', slides);
-    } catch (error) {
-        console.error('Error cargando carrusel mixto:', error);
-        loadHeroCarousel('hero-carousel', '/movie/popular', { shuffle: true, limit: 5, mediaType: 'movie' });
-    }
-}
-
-async function loadSeriesCarousel() {
-    const containerId = 'hero-carousel-series';
-    const heroContainer = document.getElementById(containerId);
-    if (!heroContainer) return;
-    if (loadedCarousels[containerId]) return;
-
-    try {
-        // IDs de red: Apple TV+ = 2552, HBO Max = 49, Netflix = 213
-        const networks = [2552, 49, 213];
-        // Fecha límite: series estrenadas en los últimos 2 años (para asegurar "recientes")
-        const today = new Date();
-        const twoYearsAgo = new Date(today);
-        twoYearsAgo.setFullYear(today.getFullYear() - 2);
-        const sinceDate = twoYearsAgo.toISOString().split('T')[0]; // formato YYYY-MM-DD
-
-        const promises = networks.map(network =>
-            fetchWithRetry(
-                `https://api.themoviedb.org/3/discover/tv?with_networks=${network}&sort_by=first_air_date.desc&first_air_date.gte=${sinceDate}&api_key=${API_KEY}&language=es-ES`
-            )
-        );
-        const results = await Promise.all(promises);
-        let allShows = [];
-        results.forEach(data => {
-            if (data.results) allShows = allShows.concat(data.results);
-        });
-
-        // Mezclar y tomar 5 aleatorias
-        const shuffled = allShows.sort(() => Math.random() - 0.5).slice(0, 5);
-        const slides = shuffled.map(show => ({ ...show, mediaType: 'tv' }));
-
-        if (slides.length === 0) {
-            // Fallback: series populares en emisión
-            loadHeroCarousel(containerId, '/tv/on_the_air', { shuffle: true, limit: 5, mediaType: 'tv' });
-            return;
-        }
-
-        await loadHeroCarouselFromData(containerId, slides);
-    } catch (error) {
-        console.error('Error cargando carrusel de series:', error);
-        loadHeroCarousel(containerId, '/tv/on_the_air', { shuffle: true, limit: 5, mediaType: 'tv' });
-    }
-}
-
-
-async function loadAnimeCarouselFromTMDB() {
-    const containerId = 'hero-carousel-anime';
-    const heroContainer = document.getElementById(containerId);
-    if (!heroContainer) return;
-    if (loadedCarousels[containerId]) return;
-
-    try {
-        // Mejores animes valorados con al menos 100 votos
-        const endpoint = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=100&page=1`;
-        const data = await fetchWithRetry(`https://api.themoviedb.org/3${endpoint}&api_key=${API_KEY}&language=es-ES`);
-        const results = data.results || [];
-        const shuffled = results.sort(() => Math.random() - 0.5).slice(0, 5);
-        const slides = shuffled.map(anime => ({ ...anime, mediaType: 'tv' }));
-
-        if (slides.length === 0) {
-            // Fallback: animes populares
-            loadHeroCarousel(containerId, '/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc', { shuffle: true, limit: 5, mediaType: 'tv' });
-            return;
-        }
-
-        await loadHeroCarouselFromData(containerId, slides);
-    } catch (error) {
-        console.error('Error cargando carrusel de anime:', error);
-        loadHeroCarousel(containerId, '/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc', { shuffle: true, limit: 5, mediaType: 'tv' });
-    }
-}
-
 
 function addGlobalPlayerListeners() {
     if (globalPlayerListenersAdded) return;
@@ -668,12 +761,44 @@ async function openPlayerModal(data) {
     currentSeason = null;
     currentEpisode = null;
     isPlayerVisible = false;
-    currentApi = 'unlimplay'; // fuente por defecto
+    currentApi = 'unlimplay';
 
-    // --- 2. Guardar los datos recibidos ---
+    // --- 2. Si falta información, obtenerla de TMDB ---
+    if (data.tmdbId && (!data.overview || !data.year || !data.duration)) {
+        try {
+            const endpoint = data.mediaType === 'movie' ? 'movie' : 'tv';
+            const url = `https://api.themoviedb.org/3/${endpoint}/${data.tmdbId}?api_key=${API_KEY}&language=es-ES`;
+            const response = await fetch(url);
+            const tmdbData = await response.json();
+            
+            if (!data.overview) data.overview = tmdbData.overview || 'Sin sinopsis disponible';
+            if (!data.year) {
+                const date = tmdbData.release_date || tmdbData.first_air_date;
+                data.year = date ? date.split('-')[0] : '';
+            }
+            if (!data.duration) {
+                if (data.mediaType === 'movie') {
+                    data.duration = formatRuntime(tmdbData.runtime);
+                } else {
+                    const episodes = tmdbData.number_of_episodes || '?';
+                    data.duration = `${episodes} episodios`;
+                }
+            }
+            // Si no hay poster, usar el de TMDB
+            if (!data.posterPath && tmdbData.poster_path) {
+                data.posterPath = `https://image.tmdb.org/t/p/w500${tmdbData.poster_path}`;
+            }
+            // Guardar los datos actualizados
+            currentModalData = data;
+        } catch (error) {
+            console.warn('No se pudieron obtener detalles de TMDB:', error);
+        }
+    }
+
+    // --- 3. Guardar los datos recibidos (ya actualizados) ---
     currentModalData = data;
 
-    // --- 3. Actualizar la interfaz con la información básica ---
+    // --- 4. Actualizar la interfaz con la información básica ---
     const titleEl = document.getElementById('player-title');
     if (titleEl) titleEl.textContent = data.title || 'Sin título';
 
@@ -687,7 +812,7 @@ async function openPlayerModal(data) {
     const synopsisEl = document.getElementById('player-synopsis');
     if (synopsisEl) synopsisEl.textContent = data.overview || 'Sin sinopsis disponible';
 
-    // --- 4. Cargar temporadas si es serie o anime ---
+    // --- 5. Cargar temporadas si es serie o anime ---
     const isSeries = (data.mediaType === 'tv' || data.mediaType === 'anime');
 
     if (isSeries && data.tmdbId) {
@@ -724,17 +849,17 @@ async function openPlayerModal(data) {
         episodeControls.style.display = 'none';
     }
 
-    // --- 5. Cargar contenido relacionado ---
+    // --- 6. Cargar contenido relacionado ---
     if (data.tmdbId) {
         loadRelatedContent(data.tmdbId, data.mediaType);
     }
 
-    // --- 6. Mostrar el modal ---
+    // --- 7. Mostrar el modal ---
     modal.style.display = 'flex';
     modal.classList.remove('fullscreen');
     disableMainScroll();
 
-    // --- 7. Reproducir automáticamente ---
+    // --- 8. Reproducir automáticamente ---
     setTimeout(() => {
         playCurrentEpisode();
     }, 150);
@@ -1648,7 +1773,7 @@ async function playAnimeEpisode(episodeUrl) {
 async function loadTabContent(tabId) {
     if (tabId === 'inicio') {
         // Cargar carrusel de inicio (películas populares, sin shuffle)
-        loadMixedCarousel();
+        loadBannerCarouselFromTMDB('banner-carousel', '/movie/popular', 'movie');
         const container = document.getElementById('categories-container-inicio');
         if (container) {
             loadRecentRow();
@@ -1661,7 +1786,7 @@ async function loadTabContent(tabId) {
         }
     } else if (tabId === 'peliculas') {
         // Cargar carrusel de películas (recientes, con shuffle)
-        loadHeroCarousel('hero-carousel-peliculas', '/movie/now_playing', { shuffle: true, limit: 5, mediaType: 'movie' });
+        loadBannerCarouselFromTMDB('banner-carousel-peliculas', '/movie/popular', 'movie');
         const container = document.getElementById('categories-container-peliculas');
         if (container) {
             await loadDynamicRow("/discover/movie?sort_by=popularity.desc&primary_release_date.lte=2026-12-31", "row-populares-pelis", "Películas populares", container.id);
@@ -1679,7 +1804,7 @@ async function loadTabContent(tabId) {
         }
     } else if (tabId === 'series') {
         // Cargar carrusel de series (emisión actual, orden aleatorio)
-        loadSeriesCarousel();
+        loadBannerCarouselFromTMDB('banner-carousel-series', '/tv/popular', 'tv');
         const container = document.getElementById('categories-container-series');
         if (container) {
             await loadDynamicRow("/discover/tv?with_networks=213&sort_by=first_air_date.desc&first_air_date.lte=2026-06-15", "row-series-nuevas-netflix", "Series de Netflix", container.id, 'es-ES', 'tv');
@@ -1705,7 +1830,12 @@ async function loadTabContent(tabId) {
         loadFavorites();
     } else if (tabId === 'anime') {
     // Cargar carrusel de anime (desde TMDB)
-    loadAnimeCarouselFromTMDB();
+loadBannerCarouselFromTMDB(
+    'banner-carousel-anime',
+    '/discover/tv?with_genres=16&with_original_language=ja&sort_by=vote_average.desc&vote_count.gte=500',
+    'tv',
+    '/discover/tv?with_genres=16&sort_by=popularity.desc'  // fallback en caso de que no haya suficientes con 500 votos
+);
     const container = document.getElementById('categories-container-anime');
     if (!container) {
         console.error('No se encuentra #categories-container-anime');
@@ -3151,80 +3281,6 @@ function closePlayer() {
 }
 
 
-// ==================== CARRUSEL REUTILIZABLE ====================
-
-
-// Obtener o crear el estado de un carrusel
-function getCarouselState(containerId) {
-    if (!carouselState[containerId]) {
-        carouselState[containerId] = { currentSlide: 0, interval: null, slides: [] };
-    }
-    return carouselState[containerId];
-}
-
-// Cargar un carrusel en un contenedor específico
-async function loadHeroCarousel(containerId, endpoint = '/movie/popular', options = { shuffle: false, limit: 5, mediaType: 'movie' }) {
-    const heroContainer = document.getElementById(containerId);
-    if (!heroContainer) return;
-    // Si ya está cargado y no se fuerza, salir
-    if (loadedCarousels[containerId] && !options.force) return;
-
-    try {
-        const response = await fetch(`https://api.themoviedb.org/3${endpoint}?api_key=${API_KEY}&language=es-ES`);
-        const data = await response.json();
-        if (!data.results || data.results.length === 0) return;
-
-        let slidesData = data.results;
-        if (options.shuffle) {
-            // Mezclar aleatoriamente
-            for (let i = slidesData.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [slidesData[i], slidesData[j]] = [slidesData[j], slidesData[i]];
-            }
-        }
-        slidesData = slidesData.slice(0, options.limit || 5);
-
-        // Limpiar slides excepto el primero
-        const slides = heroContainer.querySelectorAll('.hero-slide');
-        for (let i = slides.length - 1; i > 0; i--) {
-            slides[i].remove();
-        }
-        const baseSlide = heroContainer.querySelector('.hero-slide');
-
-        // Actualizar primer slide y crear los demás
-        await updateSlideContent(baseSlide, slidesData[0], 0, options.mediaType);
-        for (let i = 1; i < slidesData.length; i++) {
-            const newSlide = baseSlide.cloneNode(true);
-            newSlide.classList.remove('active');
-            await updateSlideContent(newSlide, slidesData[i], i, options.mediaType);
-            heroContainer.insertBefore(newSlide, heroContainer.querySelector('.carousel-prev'));
-        }
-
-        // Dots
-        const dotsContainer = heroContainer.querySelector('.carousel-dots');
-        dotsContainer.innerHTML = '';
-        slidesData.forEach((_, idx) => {
-            const dot = document.createElement('span');
-            dot.classList.add('dot');
-            if (idx === 0) dot.classList.add('active');
-            dot.addEventListener('click', () => goToSlide(idx, containerId));
-            dotsContainer.appendChild(dot);
-        });
-
-        // Guardar estado
-        const state = getCarouselState(containerId);
-        state.slides = slidesData;
-        state.currentSlide = 0;
-
-        // Iniciar carrusel
-        startCarousel(containerId);
-        attachCarouselControls(containerId);
-
-        loadedCarousels[containerId] = true;
-    } catch (error) {
-        console.error(`Error cargando carrusel ${containerId}:`, error);
-    }
-}
 
 // Obtener el primer episodio de una serie (temporada y número)
 async function getFirstEpisode(tvId) {
@@ -3252,122 +3308,6 @@ async function getFirstEpisode(tvId) {
         return null;
     }
 }
-
-
-// Actualizar contenido de un slide (mantenemos esta función sin cambios, solo recibe el slide y los datos)
-async function updateSlideContent(slide, movie, index, mediaType = 'movie') {
-    const backdropUrl = movie.backdrop_path ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}` : '';
-    const bgDiv = slide.querySelector('.hero-bg');
-    if (bgDiv && backdropUrl) bgDiv.style.backgroundImage = `url('${backdropUrl}')`;
-    slide.querySelector('.hero-title').innerText = movie.title || movie.name;
-    
-    // Año
-    const releaseDate = movie.release_date || movie.first_air_date;
-    const year = releaseDate ? releaseDate.split('-')[0] : 'Año desconocido';
-    slide.querySelector('.hero-year').innerHTML = `📅 ${year}`;
-    
-    // Duración (para series mostramos "Serie")
-    try {
-        const detailsRes = await fetch(`https://api.themoviedb.org/3/${mediaType === 'tv' ? 'tv' : 'movie'}/${movie.id}?api_key=${API_KEY}&language=es-ES`);
-        const details = await detailsRes.json();
-        let durationText = '';
-        if (mediaType === 'tv') {
-            const seasons = (details.seasons || []).filter(s => s.season_number > 0);
-            const totalEpisodes = details.number_of_episodes || '?';
-            durationText = `${seasons.length} temporada${seasons.length > 1 ? 's' : ''} · ${totalEpisodes} episodios`;
-        } else {
-            const runtime = details.runtime ? `${details.runtime} min` : 'Duración no disponible';
-            durationText = `⏱️ ${runtime}`;
-        }
-        slide.querySelector('.hero-duration').innerHTML = durationText;
-    } catch (error) {
-        slide.querySelector('.hero-duration').innerHTML = mediaType === 'tv' ? 'Serie' : '⏱️ Duración no disponible';
-    }
-    
-    const synopsis = movie.overview || 'Sin sinopsis disponible';
-    slide.querySelector('.hero-synopsis').innerText = synopsis;
-
-    const buttonsContainer = slide.querySelector('.hero-buttons');
-    buttonsContainer.innerHTML = ''; // Limpiar
-
-    // Botón Reproducir (único)
-    const playBtn = document.createElement('button');
-    playBtn.className = 'hero-btn hero-play-btn';
-    playBtn.innerHTML = '▶ Reproducir';
-    playBtn.addEventListener('click', async () => {
-        const data = {
-            tmdbId: movie.id,
-            mediaType: mediaType,
-            title: movie.title || movie.name,
-            originalLang: movie.original_language,
-            posterPath: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : '',
-            year: year, // ya lo tienes definido arriba
-            duration: '', // se obtendrá después en openPlayerModal
-            overview: movie.overview || ''
-        };
-        openPlayerModal(data);
-    });
-    buttonsContainer.appendChild(playBtn);
-
-}
-
-// Funciones de navegación específicas por contenedor
-function goToSlide(index, containerId) {
-    const state = getCarouselState(containerId);
-    const heroContainer = document.getElementById(containerId);
-    const slidesList = heroContainer.querySelectorAll('.hero-slide');
-    if (index === state.currentSlide || index >= slidesList.length) return;
-    slidesList[state.currentSlide].classList.remove('active');
-    slidesList[index].classList.add('active');
-    heroContainer.querySelectorAll('.dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
-    state.currentSlide = index;
-    resetCarouselTimer(containerId);
-}
-
-function nextSlide(containerId) {
-    const heroContainer = document.getElementById(containerId);
-    const slidesList = heroContainer.querySelectorAll('.hero-slide');
-    const state = getCarouselState(containerId);
-    const next = (state.currentSlide + 1) % slidesList.length;
-    goToSlide(next, containerId);
-}
-
-function prevSlide(containerId) {
-    const heroContainer = document.getElementById(containerId);
-    const slidesList = heroContainer.querySelectorAll('.hero-slide');
-    const state = getCarouselState(containerId);
-    const prev = (state.currentSlide - 1 + slidesList.length) % slidesList.length;
-    goToSlide(prev, containerId);
-}
-
-function startCarousel(containerId) {
-    const state = getCarouselState(containerId);
-    if (state.interval) clearInterval(state.interval);
-    state.interval = setInterval(() => nextSlide(containerId), 8000);
-}
-
-function resetCarouselTimer(containerId) {
-    const state = getCarouselState(containerId);
-    if (state.interval) {
-        clearInterval(state.interval);
-        state.interval = setInterval(() => nextSlide(containerId), 8000);
-    }
-}
-
-function attachCarouselControls(containerId) {
-    const heroContainer = document.getElementById(containerId);
-    const prevBtn = heroContainer.querySelector('.carousel-prev');
-    const nextBtn = heroContainer.querySelector('.carousel-next');
-    if (prevBtn) {
-        prevBtn.removeEventListener('click', () => prevSlide(containerId));
-        prevBtn.addEventListener('click', () => prevSlide(containerId));
-    }
-    if (nextBtn) {
-        nextBtn.removeEventListener('click', () => nextSlide(containerId));
-        nextBtn.addEventListener('click', () => nextSlide(containerId));
-    }
-}
-
 
 
 // ==================== SCROLL ====================
